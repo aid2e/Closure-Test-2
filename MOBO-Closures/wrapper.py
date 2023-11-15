@@ -31,7 +31,7 @@ def RunProblem(problem, x, kwargs):
     return problem(torch.tensor(x, **kwargs).clamp(0.0, 1.0))
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description= "Optimization Closure Test-1")
+    parser = argparse.ArgumentParser(description= "Optimization Closure Test-2")
     parser.add_argument('-c', '--config', 
                         help='Optimization configuration file', 
                         type = str, required = True)

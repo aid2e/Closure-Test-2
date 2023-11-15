@@ -98,4 +98,4 @@ def initialize_experiment(experiment,N_INIT):
 
     experiment.new_batch_trial(sobol.gen(N_INIT)).run()
 
-    return experiment.fetch_data()
+    return experiment.fetch_data() # Runs the simulation.
