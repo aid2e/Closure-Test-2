@@ -26,9 +26,17 @@ import matplotlib.pyplot as plt
 
 import wandb
 
+import subprocess
 
 def RunProblem(problem, x, kwargs):
     return problem(torch.tensor(x, **kwargs).clamp(0.0, 1.0))
+# want to get float(result[0])
+def PassThroughShell(result):
+    val = float(result[0])
+    shellcommand = ["./shell_wrapper.sh", str(val)]
+    result = subprocess.run(shellcommand, capture_output=True,text=True)
+    output = result.stdout.strip()
+    return output
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description= "Optimization Closure Test-2")
@@ -115,13 +123,20 @@ if __name__ == "__main__":
         f.write("Problem Reference points : " + str(problem.ref_point) + "\n")
         f.write("Problem Pareto Front Hypervolume : " + str(hv_pareto) + "\n")
         f.write("Problem Random Points Hypervolume : " + str(hv_npoints) + "\n")
-    
+
+
+    # torch not in eic-shell, so maybe
+    # instead interface with shell in just
+    # retrieving result of f{i}
     @glob_fun
     def ftot(x):
         return RunProblem(problem, x, tkwargs)
     def f1(xdic):
         x = tuple(xdic[k] for k in xdic.keys())
-        return float(ftot(x)[0])
+        probresult = ftot(x)
+        #print(float(ftot(x)[0]))
+        return PassThroughShell(probresult)
+        #return float(ftot(x)[0])
     def f2(xdic):
         x = tuple(xdic[k] for k in xdic.keys())
         return float(ftot(x)[1])
