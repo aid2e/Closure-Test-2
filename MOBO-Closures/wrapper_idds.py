@@ -385,6 +385,14 @@ if __name__ == "__main__":
     def f1(xdic):
         return f1_problem(xdic, problem, tkwargs)
 
+    # here f1_problem is defined with wrapper @work, it will be automatically
+    # converted to a PanDA-iDDS task.
+    # if calls f1_problem with f1_problem(xdic, problem, tkwargs, multi_jobs_kwargs_list=[{'xdic': xdic1}, {'xdic': xdic2}, {'xdic': xdic3}]),
+    # the wrapper will automatically convert it to a PanDA task with three jobs:
+    # f1_problem(xdic1, problem, tkwargs), f1_problem(xdic2, problem, tkwargs, f1_problem(xdic3, problem, tkwargs)
+    # todo: how to let AX to generate multiple trial parameters in one call. one solution is to create
+    # a new child class BatchTrial in AX.
+
     def f2(xdic):
         return f2_problem(xdic, problem, tkwargs)
 
