@@ -1,3 +1,4 @@
+import time
 import torch # pytorch package, allows using GPUs
 
 from ax.metrics.noisy_function import GenericNoisyFunctionMetric
@@ -47,7 +48,7 @@ from matplotlib.cm import ScalarMappable
 
 def glob_dummy(loc_fun):
     @wraps(loc_fun)
-    @lru_cache(maxsize=None)
+    # @lru_cache(maxsize=None)
     def inner(xdic):
         x_sorted = [xdic[p_name] for p_name in xdic.keys()] #it assumes x will be given as, e.g., dictionary
         res = loc_fun(x_sorted)
@@ -75,7 +76,7 @@ def glob_fun(loc_fun):
 """
 def glob_fun(loc_fun):
     @wraps(loc_fun)
-    @lru_cache(maxsize=None)
+    # @lru_cache(maxsize=None)
     def inner(xsorted):
       res = list(loc_fun(xsorted))
       return res
@@ -93,9 +94,39 @@ def build_experiment(search_space,optimization_config):
     return experiment
 
 
+def build_experiment_pandaidds(search_space, optimization_config, runner):
+    experiment = Experiment(
+        name="pareto_experiment",
+        search_space=search_space,
+        optimization_config=optimization_config,
+        runner=runner,
+    )
+    return experiment
+
+
 def initialize_experiment(experiment,N_INIT):
     sobol = Models.SOBOL(search_space=experiment.search_space)
 
-    experiment.new_batch_trial(sobol.gen(N_INIT)).run()
+    batch_trial = experiment.new_batch_trial(sobol.gen(N_INIT))
+
+    print("initialize trial")
+    # print(batch_trial)
+    batch_trial.run()
+    print("initialized trial")
+
+    print("Waiting for batch trial to terminate")
+    print(batch_trial)
+    time_checkpoint = time.time()
+    while not batch_trial.status.is_terminal:
+        batch_trial.runner.poll_trial_status([batch_trial])
+
+        if time.time() - time_checkpoint > 300:
+            print("waiting for terminating")
+            print(batch_trial)
+            time_checkpoint = time.time()
+        time.sleep(30)
+
+    print("batch trial is terminated")
+    print(batch_trial)
 
     return experiment.fetch_data() # Runs the simulation.

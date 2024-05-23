@@ -13,7 +13,7 @@ This documentation will evolve
 # run run_grid.sh to generate optimize config files
 
 .. code-block::
-    bash run_grid.sh optimize.config
+    python run_grid.sh optimize.config
 
 # run PanDA/iDDS jobs
 

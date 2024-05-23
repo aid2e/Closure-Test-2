@@ -36,66 +36,39 @@ class PanDAIDDSRunner(Runner):
         if not isinstance(trial, BaseTrial):
             raise ValueError("This runner only handles `BaseTrial`.")
 
-        # print(trial.index)
-        # print(trial)
-        # print(trial.arms)
-
         params_list = []
         for arm in trial.arms:
             params_list.append([arm.parameters])
         # print(params_list)
 
-        # transforms = {}
         name_results = {}
         self.transforms[trial.index] = {}
         for name in self.runner_funcs:
             # one work is one objective
             # with multiple objectives, there will be multiple work objects
-            # work = self.runner_funcs[name]
-            # w = work(multi_jobs_kwargs_list=params_list)
 
             function = self.runner_funcs[name]['function']
             pre_kwargs = self.runner_funcs[name]['pre_kwargs']
             work = work_def(function, workflow=self.workflow, pre_kwargs=pre_kwargs, return_work=True, map_results=True)
             w = work(multi_jobs_kwargs_list=params_list)
-            # print(work)
-            # print(w._func)
-            # print(w._async_result_initialized)
-            # print(w._async_ret)
             print("trial %s: submit a task for %s: %s" % (trial.index, name, w))
             tf_id = w.submit()
             w.init_async_result()
-            # self.transforms[tf_id] = {'name': name, 'work': w, 'results': None}
             self.transforms[trial.index][name] = {'tf_id': tf_id, 'work': w, 'results': None}
             name_results[name] = None
         return {'name_results': name_results}
 
     def get_trial_status(self, trial: BaseTrial):
         name_results = trial.run_metadata.get("name_results")
-        # tf_status = {}
         all_terminated, all_finished, all_failed = True, True, True
 
         for name in self.transforms[trial.index]:
-            print(name)
-            # w = transforms[tf_id]['work']
             w = self.transforms[trial.index][name]['work']
-            print(w)
             w.init_async_result()
-            # status = w.get_status()
-            # tf_status[tf_id] = status
 
-            # func_name = transforms[tf_id]['name']
-            # func_name = name
             results = w.get_results()
             # print(results)
 
-            # fake results
-            # for arm in trial.arms:
-            #     results.add_result(args=[arm.parameters], result=0.5)
-            # w.stop_async_result()
-            # print(results)
-
-            # transforms[tf_id]['results'] = results
             self.transforms[trial.index][name]['results'] = results
             name_results[name] = results
 
