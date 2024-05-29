@@ -13,3 +13,10 @@ export PANDA_CONFIG_ROOT=~/.panda/
 # doma
 export IDDS_HOST=https://aipanda105.cern.ch:443/idds
 
+export IDDS_LOG_LEVEL=debug
+
+export IDDS_LOG_FILE=idds.log
+
+export PANDA_BEHIND_REAL_LB=true
+export PANDA_VERIFY_HOST=off
+
