@@ -7,6 +7,7 @@ from typing import Iterable
 from ax.core.base_trial import BaseTrial, TrialStatus
 from ax.core.data import Data
 from ax.core.metric import Metric, MetricFetchResult, MetricFetchE
+from ax.metrics.noisy_function import GenericNoisyFunctionMetric
 from ax.core.runner import Runner
 from ax.utils.common.result import Ok, Err
 
@@ -17,6 +18,7 @@ from idds.iworkflow.work import work as work_def
 # @workflow(service='panda', local=True, cloud='US', queue='BNL_OSG_2', init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
 # @workflow_def(service='panda', local=True, cloud='US', queue='BNL_OSG_2', return_workflow=True, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
 # @workflow_def(service='panda', source_dir=None, source_dir_parent_level=1, local=True, cloud='US', queue='FUNCX_TEST', return_workflow=True, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
+
 @workflow_def(service='panda', source_dir=None, source_dir_parent_level=1, local=True, cloud='US', queue='BNL_OSG_2', return_workflow=True, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
 def empty_workflow_func():
     pass
@@ -32,7 +34,6 @@ class PanDAIDDSRunner(Runner):
         self.workflow.pre_run()
 
     def run(self, trial: BaseTrial):
-        print(self.runner_funcs)
         if not isinstance(trial, BaseTrial):
             raise ValueError("This runner only handles `BaseTrial`.")
 
@@ -43,13 +44,12 @@ class PanDAIDDSRunner(Runner):
 
         name_results = {}
         self.transforms[trial.index] = {}
-        for name in self.runner_funcs:
+
+        for name, metric in trial.experiment.metrics.items():
             # one work is one objective
             # with multiple objectives, there will be multiple work objects
-
-            function = self.runner_funcs[name]['function']
-            pre_kwargs = self.runner_funcs[name]['pre_kwargs']
-            work = work_def(function, workflow=self.workflow, pre_kwargs=pre_kwargs, return_work=True, map_results=True)
+            function = metric._f
+            work = work_def(function, workflow=self.workflow, return_work=True, map_results=True)
             w = work(multi_jobs_kwargs_list=params_list)
             print("trial %s: submit a task for %s: %s" % (trial.index, name, w))
             tf_id = w.submit()
@@ -109,8 +109,7 @@ class PanDAIDDSRunner(Runner):
         return status_dict
 
 
-class PanDAIDDSMetric(Metric):  # Pulls data for trial from external system.
-    # def __init__(self, name: str, lower_is_better: Optional[bool] = None, properties: Optional[Dict[str, Any]] = None, function: optional[Any] = None) -> None:
+class PanDAIDDSMetric(GenericNoisyFunctionMetric):  # Pulls data for trial from external system.
 
     def fetch_trial_data(self, trial: BaseTrial) -> MetricFetchResult:
         print("fetch_trial_data")

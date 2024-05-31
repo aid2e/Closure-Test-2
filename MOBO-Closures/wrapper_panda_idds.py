@@ -27,8 +27,8 @@ import matplotlib.pyplot as plt
 
 import wandb
 
-from idds.iworkflow.workflow import workflow as workflow_def      # workflow    # noqa F401
-from idds.iworkflow.work import work as work_def
+# from idds.iworkflow.workflow import workflow as workflow_def      # workflow    # noqa F401
+# from idds.iworkflow.work import work as work_def
 from ProjectUtils.panda_idds_utils import PanDAIDDSRunner, PanDAIDDSMetric
 
 
@@ -38,9 +38,9 @@ def RunProblem(problem, x, kwargs):
 
 # @workflow(service='panda', local=True, cloud='US', queue='BNL_OSG_2', init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
 # @workflow_def(service='panda', local=True, cloud='US', queue='BNL_OSG_2', return_workflow=True, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
-@workflow_def(service='panda', local=True, cloud='US', queue='FUNCX_TEST', return_workflow=True, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
-def empty_workflow_func():
-    pass
+# @workflow_def(service='panda', local=True, cloud='US', queue='FUNCX_TEST', return_workflow=True, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
+# def empty_workflow_func():
+#     pass
 
 
 def ftot(x, problem, tkwargs):
@@ -188,26 +188,19 @@ if __name__ == "__main__":
     param_names = [f"x{i}" for i in range(d)]
     
     names = ["a", "b", "c", "d"]
-    # functions = [f1, f2, f3, f4]
-    functions_problem = [f1_problem, f2_problem, f3_problem, f4_problem]
-    functions = functions_problem
+    functions = [f1, f2, f3, f4]
+    # functions_problem = [f1_problem, f2_problem, f3_problem, f4_problem]
+    # functions = functions_problem
     metrics = []
 
-    for name, function in zip(names[:M], functions_problem[:M]):
+    for name, function in zip(names[:M], functions[:M]):
         metrics.append(
             PanDAIDDSMetric(
-                name=name, lower_is_better=False
+                name=name, f=function, noise_sd=0.0, lower_is_better=False
             )
         )
 
-    runner_funcs = {}
-    for name, function in zip(names[:M], functions_problem[:M]):
-        # runner_funcs[name] = function
-        # runner_funcs[name] = work_def(function, workflow=workflow, pre_kwargs={'problem': problem, 'tkwargs': tkwargs}, return_work=True, map_results=True, no_wraps=True)
-        runner_funcs[name] = {'function': function, 'pre_kwargs': {'problem': problem, 'tkwargs': tkwargs}}
-
-    # print(runner_funcs)
-    runner = PanDAIDDSRunner(runner_funcs)
+    runner = PanDAIDDSRunner()
 
     mo = MultiObjective(
         objectives=[Objective(m) for m in metrics],
