@@ -17,7 +17,7 @@ from idds.iworkflow.work import work as work_def
 # @workflow(service='panda', local=True, cloud='US', queue='BNL_OSG_2', init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
 # @workflow_def(service='panda', local=True, cloud='US', queue='BNL_OSG_2', return_workflow=True, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
 # @workflow_def(service='panda', source_dir=None, source_dir_parent_level=1, local=True, cloud='US', queue='FUNCX_TEST', return_workflow=True, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
-@workflow_def(service='panda', source_dir=None, source_dir_parent_level=1, local=True, cloud='US', queue='BNL_OSG_2', return_workflow=True, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
+@workflow_def(service='panda', source_dir=None, source_dir_parent_level=1, local=True, cloud='US', queue='BNL_OSG_2', return_workflow=True, max_walltime=3600, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
 def empty_workflow_func():
     pass
 
@@ -26,12 +26,17 @@ class PanDAIDDSRunner(Runner):
     def __init__(self, runner_funcs=None):
         self.runner_funcs = runner_funcs
         self.transforms = {}
+        self.workflow = None
 
+        # self.workflow = empty_workflow_func()
+        # print(self.workflow)
+        # self.workflow.pre_run()
+
+    def run(self, trial: BaseTrial):
         self.workflow = empty_workflow_func()
         print(self.workflow)
         self.workflow.pre_run()
 
-    def run(self, trial: BaseTrial):
         print(self.runner_funcs)
         if not isinstance(trial, BaseTrial):
             raise ValueError("This runner only handles `BaseTrial`.")
@@ -51,7 +56,18 @@ class PanDAIDDSRunner(Runner):
             pre_kwargs = self.runner_funcs[name]['pre_kwargs']
             work = work_def(function, workflow=self.workflow, pre_kwargs=pre_kwargs, return_work=True, map_results=True)
             w = work(multi_jobs_kwargs_list=params_list)
-            print("trial %s: submit a task for %s: %s" % (trial.index, name, w))
+            w.store()
+            print("trial %s: create a task for %s: %s" % (trial.index, name, w))
+            self.transforms[trial.index][name] = {'tf_id': None, 'work': w, 'results': None}
+
+        # prepare workflow is after the work.store.
+        # in this way, the workflow will upload the work's files
+        self.workflow.store()
+        self.workflow.prepare()
+        self.workflow.submit()
+
+        for name in self.transforms[trial.index]:
+            w = self.transforms[trial.index][name]['work']
             tf_id = w.submit()
             w.init_async_result()
             self.transforms[trial.index][name] = {'tf_id': tf_id, 'work': w, 'results': None}
@@ -83,6 +99,8 @@ class PanDAIDDSRunner(Runner):
         trial.update_run_metadata({'name_results': name_results})
 
         if all_finished:
+            if self.workflow:
+                self.workflow.close()
             return TrialStatus.COMPLETED
         elif all_failed:
             return TrialStatus.FAILED
