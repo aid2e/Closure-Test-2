@@ -253,7 +253,7 @@ if __name__ == "__main__":
         start_tot = time.time()
         experiment = build_experiment_pandaidds(search_space,optimization_config, runner)
         start_gen = time.time()
-        data = initialize_experiment(experiment,N_INIT)
+        data = initialize_experiment_pandaidds(experiment,N_INIT)
         end_gen = time.time()
         exp_df = exp_to_df(experiment)
         outcomes = torch.tensor(exp_df[names[:M]].values, **tkwargs)

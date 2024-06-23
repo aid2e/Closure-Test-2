@@ -114,6 +114,19 @@ def initialize_experiment(experiment,N_INIT):
     batch_trial.run()
     print("initialized trial")
 
+    return experiment.fetch_data() # Runs the simulation.
+
+
+def initialize_experiment_pandaidds(experiment,N_INIT):
+    sobol = Models.SOBOL(search_space=experiment.search_space)
+
+    batch_trial = experiment.new_batch_trial(sobol.gen(N_INIT))
+
+    print("initialize trial")
+    # print(batch_trial)
+    batch_trial.run()
+    print("initialized trial")
+
     print("Waiting for batch trial to terminate")
     print(batch_trial)
     time_checkpoint = time.time()
