@@ -12,6 +12,7 @@ export PANDA_CONFIG_ROOT=~/.panda/
 
 # doma
 # export IDDS_HOST=https://aipanda105.cern.ch:443/idds
+unset IDDS_HOST
 
 export IDDS_LOG_LEVEL=debug
 
