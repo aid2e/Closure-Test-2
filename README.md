@@ -13,6 +13,12 @@ There are two ways one can think about the integration.
 1. Running within a given infracstructure like iDDS/PaNDA:
 
 
-# Integrating ePIC software stack into iDDS/PaNDA
+# Updates on 27th June 2024
 
-# 
+Combined the Joblib Runner and PanDA idds runner into one. 
+
+To use, add additional argument `--runner` it takes in two values, `joblib` or `panda`.\
+
+# TO DO
+
+Convert the optimization loop into Scheduler. Use a scheduler which automatically checks if trails are completed in a fixed interval of time and submits subsequent trails.
