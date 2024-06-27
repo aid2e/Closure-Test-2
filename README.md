@@ -21,4 +21,5 @@ To use, add additional argument `--runner` it takes in two values, `joblib` or `
 
 # TO DO
 
-Convert the optimization loop into Scheduler. Use a scheduler which automatically checks if trails are completed in a fixed interval of time and submits subsequent trails.
+* Convert the optimization loop into Scheduler. Use a scheduler which automatically checks if trails are completed in a fixed interval of time and submits subsequent trails.
+* Create a flag to run "one Execution" for each design point returning all the objectives instead of running M executions (jobs) corresponding to M objectives
