@@ -53,7 +53,6 @@ class PanDAIDDSRunner(Runner):
         for name in self.runner_funcs:
             # one work is one objective
             # with multiple objectives, there will be multiple work objects
-
             function = self.runner_funcs[name]['function']
             pre_kwargs = self.runner_funcs[name]['pre_kwargs']
             work = work_def(function, workflow=self.workflow, pre_kwargs=pre_kwargs, return_work=True, map_results=True)
