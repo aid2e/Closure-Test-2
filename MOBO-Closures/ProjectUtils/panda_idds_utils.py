@@ -17,7 +17,12 @@ from idds.iworkflow.work import work as work_def
 # @workflow(service='panda', local=True, cloud='US', queue='BNL_OSG_2', init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
 # @workflow_def(service='panda', local=True, cloud='US', queue='BNL_OSG_2', return_workflow=True, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
 # @workflow_def(service='panda', source_dir=None, source_dir_parent_level=1, local=True, cloud='US', queue='FUNCX_TEST', return_workflow=True, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
-@workflow_def(service='panda', source_dir=None, source_dir_parent_level=1, local=True, cloud='US', queue='BNL_OSG_1', exclude_source_files=["DTLZ2*", ".*json", ".*log"], return_workflow=True, max_walltime=3600, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
+# @workflow_def(service='panda', source_dir=None, source_dir_parent_level=1, local=True, cloud='US', queue='BNL_OSG_1', exclude_source_files=["DTLZ2*", ".*json", ".*log"], return_workflow=True, max_walltime=3600, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
+# @workflow_def(service='panda', source_dir=None, source_dir_parent_level=1, local=True, cloud='US', queue='BNL_PanDA_1', exclude_source_files=["DTLZ2*", ".*json", ".*log"], return_workflow=True, max_walltime=3600, init_env=None)
+# @workflow_def(service='panda', source_dir=None, source_dir_parent_level=1, local=True, cloud='US', queue='BNL_OSG_2', exclude_source_files=["DTLZ2*", ".*json", ".*log"], return_workflow=True, max_walltime=3600, init_env=None)
+# @workflow_def(service='panda', source_dir=None, source_dir_parent_level=1, local=True, cloud='US', queue='BNL_OSG_2', exclude_source_files=["DTLZ2*", ".*json", ".*log"], return_workflow=True, max_walltime=3600, init_env="conda env create --prefix=./workdir -f environment.yml; conda activate ./workdir; pip install --no-cache-dir ax-platform torch pandas numpy matplotlib wandb botorch idds-client idds-common idds-workflow panda-client;")
+# @workflow_def(service='panda', source_dir=None, source_dir_parent_level=1, local=True, cloud='US', queue='BNL_OSG_2', exclude_source_files=["DTLZ2*", ".*json", ".*log"], return_workflow=True, max_walltime=3600, init_env="python3 -m venv ./workdir; source ./workdir/bin/activate; pip install --no-cache-dir numpy==1.26.4 ax-platform torch pandas matplotlib wandb botorch idds-client idds-common idds-workflow panda-client; which python; ", clean_env="rm -fr ./workdir")
+@workflow_def(service='panda', source_dir=None, source_dir_parent_level=1, local=True, cloud='US', queue='BNL_OSG_2', exclude_source_files=["DTLZ2*", ".*json", ".*log"], return_workflow=True, max_walltime=3600, init_env="source /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_conda_0.9/opt/conda/setup_mamba.sh; ")
 def empty_workflow_func():
     pass
 
@@ -59,8 +64,8 @@ class PanDAIDDSRunner(Runner):
             work = work_def(function, workflow=self.workflow, pre_kwargs=pre_kwargs, return_work=True, map_results=True)
             w = work(multi_jobs_kwargs_list=params_list)
             # w.store()
-            print("trial %s: create a task for %s: %s" % (trial.index, name, w))
-            self.transforms[trial.index][self.retries][name] = {'tf_id': None, 'work': w, 'results': None}
+            print("trial %s: create a task for %s: (%s) %s" % (trial.index, name, w.internal_id, w))
+            self.transforms[trial.index][self.retries][name] = {'tf_id': None, 'work': w, 'results': None, 'status': 'new'}
 
         # prepare workflow is after the work.store.
         # in this way, the workflow will upload the work's files
@@ -74,123 +79,104 @@ class PanDAIDDSRunner(Runner):
             if not tf_id:
                 raise Exception("Failed to submit work to PanDA")
             w.init_async_result()
-            self.transforms[trial.index][self.retries][name] = {'tf_id': tf_id, 'work': w, 'results': None}
-            name_results[name] = None
+            self.transforms[trial.index][self.retries][name] = {'tf_id': tf_id, 'work': w, 'results': None, 'status': 'new'}
+            name_results[name] = {'status': 'running', 'retries': 0, 'result': None}
         return {'name_results': name_results}
 
-    def verify_results(self, trial: BaseTrial):
-        name_results = trial.run_metadata.get("name_results")
+    def verify_results(self, trial: BaseTrial, name, results):
         all_arms_finished = True,
-        unfinished_arms = {}
+        unfinished_arms = []
+        print(f"trial {trial.index} work {name} verify_results: {results}")
         for arm in trial.arms:
-            # all_has_results = True
-            for name in self.transforms[trial.index][self.retries]:
-                results = name_results.get(name, None)
-                ret = results.get_result(name=None, args=[arm.parameters])
-                if ret is None:
-                    # all_has_results = False
-                    all_arms_finished = False
-                    if name not in unfinished_arms:
-                        unfinished_arms[name] = []
-                    unfinished_arms[name].append(arm)
-            """
-            if not all_has_results:
+            ret = results.get_result(name=None, args=[arm.parameters])
+            if ret is None:
                 all_arms_finished = False
-                for name in self.transforms[trial.index]:
-                    results = name_results.get(name, None)
-                    results.set_result(name=None, args=[arm.parameters], value=None)
-            """
+                unfinished_arms.append(arm)
         return all_arms_finished, unfinished_arms
 
-    def submit_retries(self, trial, unfinished_arms):
-        self.retries += 1
-        print(f"submit retries {self.retries} for {unfinished_arms}")
-        self.transforms[trial.index][self.retries] = {}
-        for name in unfinished_arms:
-            # one work is one objective
-            # with multiple objectives, there will be multiple work objects
+    def submit_retries(self, trial, name, retries, unfinished_arms):
+        print(f"trial {trial.index} work {name} submit retries {retries} for {unfinished_arms}")
+        self.transforms[trial.index][retries] = {}
 
-            function = self.runner_funcs[name]['function']
-            pre_kwargs = self.runner_funcs[name]['pre_kwargs']
-            params_list = []
-            for arm in unfinished_arms[name]:
-                params_list.append([arm.parameters])
+        # one work is one objective
+        # with multiple objectives, there will be multiple work objects
 
-            work = work_def(function, workflow=self.workflow, pre_kwargs=pre_kwargs, return_work=True, map_results=True)
-            w = work(multi_jobs_kwargs_list=params_list)
-            # w.store()
-            print("trial %s, retries %s: create a task for %s: %s" % (trial.index, self.retries, name, w))
-            tf_id = w.submit()
-            print("trial %s, retries %s: submit a task for %s: %s, %s" % (trial.index, self.retries, name, w, tf_id))
-            if not tf_id:
-                raise Exception("Failed to submit work to PanDA")
-            self.transforms[trial.index][self.retries][name] = {'tf_id': tf_id, 'work': w, 'results': None}
+        function = self.runner_funcs[name]['function']
+        pre_kwargs = self.runner_funcs[name]['pre_kwargs']
+        params_list = []
+        for arm in unfinished_arms:
+            params_list.append([arm.parameters])
+
+        work = work_def(function, workflow=self.workflow, pre_kwargs=pre_kwargs, return_work=True, map_results=True)
+        w = work(multi_jobs_kwargs_list=params_list)
+        # w.store()
+        print("trial %s, retries %s: create a task for %s: %s" % (trial.index, retries, name, w))
+        tf_id = w.submit()
+        print("trial %s, retries %s: submit a task for %s: %s, %s" % (trial.index, retries, name, w, tf_id))
+        if not tf_id:
+            raise Exception("Failed to submit work to PanDA")
+        self.transforms[trial.index][retries][name] = {'tf_id': tf_id, 'work': w, 'results': None}
 
     def get_trial_status(self, trial: BaseTrial):
         name_results = trial.run_metadata.get("name_results")
-        all_terminated, all_finished, all_failed = True, True, True
+        all_finished, all_failed, all_terminated = True, True, True
 
-        if self.retries == 0:
-            for name in self.transforms[trial.index][self.retries]:
-                w = self.transforms[trial.index][self.retries][name]['work']
+        for name in name_results:
+            status = name_results[name]['status']
+            retries = name_results[name]['retries']
+            avail_results = name_results[name]['result']
+            if status not in ['finished', 'terminated', 'failed']:
+                w = self.transforms[trial.index][retries][name]['work']
+                tf_id = self.transforms[trial.index][retries][name]['tf_id']
                 w.init_async_result()
 
-                results = w.get_results()
+                # results = w.get_results()
                 # print(results)
 
-                self.transforms[trial.index][self.retries][name]['results'] = results
-                name_results[name] = results
-
                 if not w.is_terminated():
-                    all_terminated, all_finished, all_failed = False, False, False
+                    all_finished, all_failed, all_terminated = False, False, False
                 else:
-                    if not w.is_finished():
-                        all_finished = False
-                    if not w.is_failed():
+                    results = w.get_results()
+                    print(f"trial {trial.index} work {name} retries {retries} results: {results}")
+                    self.transforms[trial.index][retries][name]['results'] = results
+                    if w.is_finished():
+                        print(f"trial {trial.index} work {name} retries {retries} finished")
+                        name_results[name]['status'] = 'finished'
                         all_failed = False
-        else:
-            for name in self.transforms[trial.index][self.retries]:
-                w = self.transforms[trial.index][self.retries][name]['work']
-                tf_id = self.transforms[trial.index][self.retries][name]['tf_id']
-                w.init_async_result()
-
-                results = w.get_results()
-                # print(results)
-
-                self.transforms[trial.index][self.retries][name]['results'] = results
-                # name_results[name] = results
-
-                if not w.is_terminated():
-                    all_terminated, all_finished, all_failed = False, False, False
-                else:
-                    if not w.is_finished():
+                    elif w.is_failed():
+                        print(f"trial {trial.index} work {name} retries {retries} failed")
+                        name_results[name]['status'] = 'failed'
                         all_finished = False
-                    if not w.is_failed():
-                        all_failed = False
-                if all_terminated or all_finished:
-                    print(f"Work {name} terminated")
-                    avail_results = name_results[name]
-                    for arm in trial.arms:
-                        ret = avail_results.get_result(name=None, args=[arm.parameters])
-                        if ret is None:
-                            print(f"Work {name} missing results for arm {arm.name}")
-                            # get results from new retries
-                            if results:
-                                new_ret = results.get_result(name=None, args=[arm.parameters])
-                                print(f"Work {name} checking results for arm {arm.name} from new transform {tf_id}, new results: {new_ret}")
-                                if new_ret is not None:
-                                    print(f"Work {name} set result for arm {arm.name} from new transform {tf_id} to {new_ret}")
-                                    # avail_results.set_result(name=None, args=[arm.parameters], value=new_ret)
-                                    name_results[name].set_result(name=None, args=[arm.parameters], value=new_ret)
+                    else:
+                        print(f"trial {trial.index} work {name} retries {retries} terminated")
+                        name_results[name]['status'] = 'terminated'
+                        all_finished = False
+                    if avail_results is None:
+                        name_results[name]['result'] = results
+                    else:
+                        for arm in trial.arms:
+                            ret = avail_results.get_result(name=None, args=[arm.parameters])
+                            if ret is None:
+                                print(f"trial {trial.index} work {name} missing results for arm {arm.name}")
+                                # get results from new retries
+                                if results:
+                                    new_ret = results.get_result(name=None, args=[arm.parameters])
+                                    print(f"trial {trial.index} work {name} checking results for arm {arm.name} from new transform {tf_id}, new results: {new_ret}")
+                                    if new_ret is not None:
+                                        print(f"trial {trial.index} work {name} set result for arm {arm.name} from new transform {tf_id} to {new_ret}")
+                                        # avail_results.set_result(name=None, args=[arm.parameters], value=new_ret)
+                                        name_results[name]['result'].set_result(name=None, args=[arm.parameters], value=new_ret)
 
-        if all_finished or all_terminated:
-            print(f"Work {name} terminated.")
-            ret, unfinished_arms = self.verify_results(trial)
-            if not ret and self.retries < 3:
-                all_finished = False
-                all_terminated = False
-                # retry failed jobs
-                self.submit_retries(trial, unfinished_arms)
+                    ret, unfinished_arms = self.verify_results(trial, name, name_results[name]['result'])
+                    print(f"trial {trial.index} work {name} verify_results: ret: {ret}, unfinished_arms: {unfinished_arms}")
+                    if ret:
+                        all_finished = False
+                    if not ret and retries < 3:
+                        retries += 1
+                        all_finished, all_failed, all_terminated = False, False, False
+                        self.submit_retries(trial, name, retries, unfinished_arms)
+                        name_results[name]['retries'] = retries
+                        name_results[name]['status'] = 'running'
 
         trial.update_run_metadata({'name_results': name_results})
 
@@ -199,7 +185,6 @@ class PanDAIDDSRunner(Runner):
                 self.workflow.close()
             return TrialStatus.COMPLETED
         elif all_failed:
-            self.verify_results(trial)
             return TrialStatus.FAILED
         elif all_terminated:
             # no subfinished status
@@ -228,14 +213,15 @@ class PanDAIDDSMetric(Metric):  # Pulls data for trial from external system.
     # def __init__(self, name: str, lower_is_better: Optional[bool] = None, properties: Optional[Dict[str, Any]] = None, function: optional[Any] = None) -> None:
 
     def fetch_trial_data(self, trial: BaseTrial) -> MetricFetchResult:
-        print("fetch_trial_data")
+        print(f"trial {trial.index} fetch_trial_data")
         if not isinstance(trial, BaseTrial):
             raise ValueError("This metric only handles `BaseTrial`.")
 
         try:
             name_results = trial.run_metadata.get("name_results")
             df_dict_list = []
-            results = name_results.get(self.name, None)
+            results_dict = name_results.get(self.name, {})
+            results = results_dict.get('result', None)
 
             if results is not None:
                 for arm in trial.arms:
@@ -250,7 +236,7 @@ class PanDAIDDSMetric(Metric):  # Pulls data for trial from external system.
                         }
                         df_dict_list.append(df_dict)
                     else:
-                        print(f"{self.name} misses result for {arm.name}")
+                        print(f"trial {trial.index} {self.name} misses result for {arm.name}")
                         df_dict = {
                             "trial_index": trial.index,
                             "metric_name": self.name,
@@ -263,5 +249,5 @@ class PanDAIDDSMetric(Metric):  # Pulls data for trial from external system.
             return Ok(value=Data(df=pd.DataFrame.from_records(df_dict_list)))
         except Exception as e:
             return Err(
-                MetricFetchE(message=f"Failed to fetch {self.name}", exception=e)
+                MetricFetchE(message=f"trial {trial.index} failed to fetch {self.name}", exception=e)
             )
