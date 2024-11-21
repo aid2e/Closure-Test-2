@@ -36,13 +36,6 @@ def RunProblem(problem, x, kwargs):
     return problem(torch.tensor(x, **kwargs).clamp(0.0, 1.0))
 
 
-# @workflow(service='panda', local=True, cloud='US', queue='BNL_OSG_2', init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
-# @workflow_def(service='panda', local=True, cloud='US', queue='BNL_OSG_2', return_workflow=True, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
-# @workflow_def(service='panda', local=True, cloud='US', queue='FUNCX_TEST', return_workflow=True, init_env="singularity exec --pwd $(pwd) -B $(pwd):$(pwd) /cvmfs/unpacked.cern.ch/gitlab-registry.cern.ch/wguan/mlcontainer:py311_0.0.3")
-# def empty_workflow_func():
-#     pass
-
-
 def ftot(x, problem, tkwargs):
     return list(RunProblem(problem, x, tkwargs))
 
@@ -336,26 +329,25 @@ if __name__ == "__main__":
                       }
         MLTracker.log(logMetrics)
 
-    model = Models.FULLYBAYESIANMOO(
-        experiment=experiment,
-        data=data,
-        num_samples=num_samples,
-        warmup_steps=warmup_steps,
-        torch_device=tkwargs["device"],
-        torch_dtype=tkwargs["dtype"],
-        verbose=False,  # Set to True to print stats from MCMC
-        disable_progbar=False,  # Set to False to print a progress bar from MCMC
-    )
-
-    generator_run = model.gen(BATCH_SIZE)
-
     while(converged > tol and last_call <= max_calls and check_imp):
         start_tot = time.time()
         start_mcmc = time.time()
+        model = Models.FULLYBAYESIANMOO(
+            experiment=experiment,
+            data=data,
+            num_samples=num_samples,
+            warmup_steps=warmup_steps,
+            torch_device=tkwargs["device"],
+            torch_dtype=tkwargs["dtype"],
+            verbose=False,  # Set to True to print stats from MCMC
+            disable_progbar=False,  # Set to False to print a progress bar from MCMC
+        )
         end_mcmc = time.time()
-        start_gen = time.time()
 
+        start_gen = time.time()
+        generator_run = model.gen(BATCH_SIZE)
         end_gen = time.time()
+
         start_trail = time.time()
 
         trial = experiment.new_batch_trial(generator_run=generator_run)

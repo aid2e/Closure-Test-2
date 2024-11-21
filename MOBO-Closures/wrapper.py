@@ -278,26 +278,24 @@ if __name__ == "__main__":
                       }
         MLTracker.log(logMetrics)
 
-    model = Models.FULLYBAYESIANMOO(
-        experiment=experiment,
-        data=data,
-        num_samples=num_samples,
-        warmup_steps=warmup_steps,
-        torch_device=tkwargs["device"],
-        torch_dtype=tkwargs["dtype"],
-        verbose=False,  # Set to True to print stats from MCMC
-        disable_progbar=False,  # Set to False to print a progress bar from MCMC
-    )
-
-    generator_run = model.gen(BATCH_SIZE)
-
     while(converged > tol and last_call <= max_calls and check_imp):
         start_tot = time.time()
         start_mcmc = time.time()
+        model = Models.FULLYBAYESIANMOO(
+            experiment=experiment,
+            data=data,
+            num_samples=num_samples,
+            warmup_steps=warmup_steps,
+            torch_device=tkwargs["device"],
+            torch_dtype=tkwargs["dtype"],
+            verbose=False,  # Set to True to print stats from MCMC
+            disable_progbar=False,  # Set to False to print a progress bar from MCMC
+        )
         end_mcmc = time.time()
         start_gen = time.time()
-
+        generator_run = model.gen(BATCH_SIZE)
         end_gen = time.time()
+
         start_trail = time.time()
 
         trial = experiment.new_batch_trial(generator_run=generator_run)
